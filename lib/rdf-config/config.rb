@@ -31,7 +31,7 @@ class RDFConfig
 
     def config_file_path(name)
       fpath = Pathname.new(@config_dir).join("#{name}.yaml").to_path
-      raise ConfigNotFound, "Config file (#{fpath}) does not exist." unless File.exist?(fpath)
+      raise ConfigNotFound, "ERROR: Config file (#{fpath}) does not exist." unless File.exist?(fpath)
 
       fpath
     end

@@ -14,6 +14,7 @@ require 'rdf-config/schema/chart/unknown_node_generator'
 require 'rdf-config/schema/chart/prefix_generator'
 require 'rdf-config/schema/chart/arc_generator'
 require 'rdf-config/schema/chart/table_generator'
+require 'rdf-config/schema/chart/validator'
 
 class REXML::Element
   def add_attribute_by_hash(attr_hash)
@@ -80,14 +81,6 @@ class RDFConfig
         return if option_names.empty?
 
         schema_name = option_names.shift
-        unless schema_name.empty?
-          if @config.schema.key?(schema_name)
-            @schema_name = schema_name
-          else
-            errors << "Schema name '#{schema_name}' is specified but not found in schema.yaml file."
-          end
-        end
-
         if (table_types & option_names).size == table_types.size
           errors << "Both 'arc' option and 'table' option cannot be specified."
         end
@@ -101,14 +94,21 @@ class RDFConfig
             @display_title = false if name == 'no_title'
             @display_prefix = false if name == 'no_prefix'
           else
-            errors << "Invalid option '#{name}' is specified."
+            errors << "Invalid schema chart type '#{name}' is specified. Valid schema chart types are 'nest', 'arc' and 'table'."
           end
         end
 
-        unless errors.empty?
-          error_msg = "ERROR:\n#{errors.map { |msg| "  #{msg}" }.join("\n")}"
-          raise InvalidSchemaOption, error_msg
+        validator = Chart::Validator.new(model, @config, schema_name)
+        unless schema_name.empty?
+          @schema_name = schema_name
+          validator.validate
         end
+
+        error_messages = []
+        error_messages << validator.error_message if validator.error?
+        error_messages << "ERROR: Invalid --schema option.\n#{errors.map { |msg| "  #{msg}" }.join("\n")}" unless errors.empty?
+
+        raise InvalidSchemaOption, error_messages.join("\n") unless error_messages.empty?
       end
 
       def interpret_variables
