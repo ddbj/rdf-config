@@ -13,6 +13,7 @@ class RDFConfig
         @targets = config.stanza.keys
       else
         raise StanzaConfigNotFound, "No stanza config found: stanza name '#{stanza_name}'" unless config.stanza.key?(stanza_name)
+        @name = stanza_name
         @targets = [stanza_name]
       end
     end
@@ -89,15 +90,21 @@ class RDFConfig
     end
 
     def sparql_result_html(suffix = '', indent_chars = '  ')
-      lines = []
+      lines = ['<table>']
+      lines << "#{indent_chars}<tr>"
+      sparql.variables.each do |var_name|
+        lines << "#{indent_chars * 2}<th>#{var_name}</th>"
+      end
+      lines << "#{indent_chars}</tr>"
 
       lines << "{{#each #{@name}}}"
-      lines << %(#{indent_chars}<dl class="dl-horizontal">)
+      lines << "#{indent_chars}<tr>"
       sparql.variables.each do |var_name|
-        lines << "#{indent_chars * 2}<dt>#{var_name}</dt><dd>{{#{var_name}#{suffix}}}</dd>"
+        lines << "#{indent_chars * 2}<td>{{#{var_name}.value}}</td>"
       end
-      lines << "#{indent_chars}</dl>"
+      lines << "#{indent_chars}</tr>"
       lines << '{{/each}}'
+      lines << '</table>'
 
       lines.join("\n")
     end
