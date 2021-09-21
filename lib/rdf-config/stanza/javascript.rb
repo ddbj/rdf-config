@@ -4,6 +4,21 @@ require 'expect'
 
 $expect_verbose = true
 
+module SafePty
+  def self.spawn command, &block
+    PTY.spawn(command) do |r, w, p|
+      begin
+        yield r, w, p
+      rescue Errno::EIO
+      ensure
+        Process.wait p
+      end
+    end
+
+    $?.exitstatus
+  end
+end
+
 class RDFConfig
   class Stanza
     class JavaScript < Stanza
@@ -21,7 +36,7 @@ class RDFConfig
         cmd = "npx togostanza init --name #{File.basename(stanza_base_dir)} --package-manager npm"
         $stderr.puts "Execute command: #{cmd}"
         Dir.chdir(output_dir) do
-          PTY.getpty(cmd) do |i, o|
+          exit_status = SafePty.spawn(cmd) do |i, o, pid|
             o.sync = true
 
             # i.expect(/Git repository URL \(leave blank if you don't need to push to a remote Git repository\):/) do |line|
@@ -39,9 +54,10 @@ class RDFConfig
             i.expect(/create mode 100644 package.json/) do |line|
               puts line
             end
-            # while i.eof? == false
-            #   puts i.gets
-            # end
+
+            until i.eof? do
+              i.readline
+            end
           end
         end
 
@@ -53,7 +69,7 @@ class RDFConfig
         cmd = %Q/npx togostanza generate stanza #{@name} --label "#{label}" --definition "#{definition}" --type Stanza --provider RDF-config/
         $stderr.puts "Execute command: #{cmd}"
         Dir.chdir(stanza_base_dir) do
-          PTY.getpty(cmd) do |i, o|
+          exit_status = SafePty.spawn(cmd) do |i, o, pid|
             o.sync = true
 
             i.expect(/license:/) do |line|
@@ -72,8 +88,8 @@ class RDFConfig
             end
             i.gets
 
-            while i.eof? == false
-              puts i.gets
+            until i.eof? do
+              puts i.readline
             end
           end
         end
