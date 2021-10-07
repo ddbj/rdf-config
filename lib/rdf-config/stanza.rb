@@ -90,21 +90,22 @@ class RDFConfig
     end
 
     def sparql_result_html(suffix = '', indent_chars = '  ')
-      lines = ['<table>']
-      lines << "#{indent_chars}<tr>"
-      sparql.variables.each do |var_name|
-        lines << "#{indent_chars * 2}<th>#{var_name}</th>"
-      end
-      lines << "#{indent_chars}</tr>"
+      lines = ["{{#each #{@name}}}"]
 
-      lines << "{{#each #{@name}}}"
-      lines << "#{indent_chars}<tr>"
-      sparql.variables.each do |var_name|
-        lines << "#{indent_chars * 2}<td>{{#{var_name}.value}}</td>"
+      unless parameters.empty?
+        first_parameter_name = parameters.keys.first
+        lines << '<p class="greeting">'
+        lines << "#{first_parameter_name}: {{#{first_parameter_name}.value}}"
+        lines << '</p>'
       end
-      lines << "#{indent_chars}</tr>"
+
+      sparql.variables.each do |var_name|
+        lines << '<dl>'
+        lines << "#{indent_chars}<dt>#{var_name}</dt>"
+        lines << "#{indent_chars}<dd>{{#{var_name}.value}}</dd>"
+        lines << '</dl>'
+      end
       lines << '{{/each}}'
-      lines << '</table>'
 
       lines.join("\n")
     end
@@ -138,25 +139,33 @@ class RDFConfig
     end
 
     def stanza_conf
-      @stanza ||= @config.stanza[@name]
+      @stanza_conf ||= @config.stanza[@name]
+    end
+
+    def sparql_name
+      stanza_conf['sparql']
+    end
+
+    def sparql_conf
+      @sparql_conf ||= @config.sparql[sparql_name]
     end
 
     def sparql_prefix_generator
       @sparql_prefix_generator = SPARQL::PrefixGenerator.new(
-          @config, sparql_query_name: stanza_conf['sparql']
+          @config, sparql_query_name: sparql_name
       )
     end
 
     def sparql_select_generator
       @sparql_select_generator = SPARQL::SelectGenerator.new(
-          @config, sparql_query_name: stanza_conf['sparql']
+          @config, sparql_query_name: sparql_name
       )
     end
 
     def sparql_where_generator
       @sparql_select_generator = SPARQL::WhereGenerator.new(
           @config,
-          sparql_query_name: stanza_conf['sparql'], template: true
+          sparql_query_name: sparql_name, template: true
       )
     end
 

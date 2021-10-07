@@ -2,8 +2,6 @@ require 'open3'
 require 'pty'
 require 'expect'
 
-$expect_verbose = true
-
 module SafePty
   def self.spawn command, &block
     PTY.spawn(command) do |r, w, p|
@@ -31,25 +29,30 @@ class RDFConfig
       def init_stanza
         return if File.exist?(stanza_base_dir)
 
+        dirname = File.dirname(stanza_base_dir)
+        basename = File.basename(stanza_base_dir)
+
         $stderr.puts "Initialize a togostanza repository."
-        mkdir(output_dir)
-        cmd = "npx togostanza init --name #{File.basename(stanza_base_dir)} --package-manager npm"
+        cmd = "npx togostanza init --name #{basename} --package-manager npm"
         $stderr.puts "Execute command: #{cmd}"
-        Dir.chdir(output_dir) do
+
+        $expect_verbose = false
+        Dir.chdir(dirname) do
           exit_status = SafePty.spawn(cmd) do |i, o, pid|
             o.sync = true
 
-            # i.expect(/Git repository URL \(leave blank if you don't need to push to a remote Git repository\):/) do |line|
             i.expect(/Git repository URL/) do |line|
-              print " (leave blank if you don't need to push to a remote Git repository): "
+              print "\e[32m?\e[0m Git repository URL (leave blank if you don't need to push to a remote Git repository): "
               o.puts STDIN.gets
             end
 
             i.expect(/license:/) do |line|
-              print ' '
+              print "\e[32m?\e[0m license: "
               o.puts STDIN.gets
             end
             i.gets
+
+            $expect_verbose = true
 
             i.expect(/create mode 100644 package.json/) do |line|
               puts line
@@ -66,33 +69,32 @@ class RDFConfig
       end
 
       def generate_template
-        cmd = %Q/npx togostanza generate stanza #{@name} --label "#{label}" --definition "#{definition}" --type Stanza --provider RDF-config/
+        cmd = %Q/npx togostanza generate stanza #{@name} --label "#{label}" --definition "#{definition}"/
         $stderr.puts "Execute command: #{cmd}"
         Dir.chdir(stanza_base_dir) do
+          $expect_verbose = false
           exit_status = SafePty.spawn(cmd) do |i, o, pid|
             o.sync = true
 
             i.expect(/license:/) do |line|
-              print ' '
+              print "\e[32m?\e[0m license: "
               o.puts STDIN.gets
             end
 
             i.expect(/author:/) do |line|
-              print ' '
-              o.puts STDIN.gets
-            end
-
-            i.expect(/address:/) do |line|
-              print ' '
+              print "\e[32m?\e[0m author: "
+              $expect_verbose = false
               o.puts STDIN.gets
             end
             i.gets
 
+            $expect_verbose = true
             until i.eof? do
               puts i.readline
             end
           end
         end
+        puts
       rescue Errno::ENOENT => e
         raise StanzaExecutionFailure, "#{e.message}\nMake sure Node.js is installed or npx command path is set in your PATH environment variable."
       end
@@ -128,7 +130,7 @@ class RDFConfig
       def index_js
         parameter_lines = []
         parameters.each do |key, parameter|
-          parameter_lines << %Q/#{' ' * 10}#{key}: "#{parameter['example']}",/
+          parameter_lines << %Q/#{' ' * 10}#{key}: this.params['#{key}'] || "#{parameter['example']}",/
         end
 
         <<-EOS
@@ -170,6 +172,10 @@ EOS
         STDERR.puts "To view the stanza, run (cd #{stanza_base_dir}; npx togostanza serve) and open http://localhost:8080/"
       end
 
+      def stanza_base_dir
+        output_dir
+      end
+
       def index_js_fpath
         "#{stanza_dir}/index.js"
       end
@@ -184,6 +190,30 @@ EOS
 
       def stanza_dir
         "#{stanza_base_dir}/stanzas/#{@name.split('_').join('-')}"
+      end
+
+      def parameters_for_metadata(prefix = '')
+        params = []
+
+        parameters.each do |name, value|
+          triple = model.find_by_object_name(name)
+          params << {
+            "#{prefix}key" => name,
+            "#{prefix}example" => value,
+            "#{prefix}description" => "#{triple.subject.name} / #{triple.property_path(' / ')} (FIXME: in metadata.json)",
+            "#{prefix}required" => triple.predicates.last.required?,
+          }
+        end
+
+        params
+      end
+
+      def parameters
+        sparql_conf['parameters'] || {}
+      end
+
+      def model
+        @model ||= RDFConfig::Model.new(@config)
       end
     end
   end
