@@ -8,17 +8,26 @@ class RDFConfig
     def initialize(config, opts = {})
       @config = config
 
-      stanza_name = opts[:stanza_name].to_s
-      if stanza_name.empty?
+      @stanza_name = opts[:stanza_name].to_s
+      if @stanza_name.empty?
         @targets = config.stanza.keys
       else
-        raise StanzaConfigNotFound, "No stanza config found: stanza name '#{stanza_name}'" unless config.stanza.key?(stanza_name)
-        @name = stanza_name
-        @targets = [stanza_name]
+        raise StanzaConfigNotFound, "No stanza config found: stanza name '#{@stanza_name}'" unless config.stanza.key?(@stanza_name)
+        @name = @stanza_name
+        @targets = [@stanza_name]
       end
     end
 
+    def print_config
+      puts "stanza names: #{@config.stanza.keys.join(', ')}"
+    end
+
     def generate
+      if @stanza_name.empty?
+        print_config
+        return
+      end
+
       before_generate
       @targets.each do |stanza_name|
         @name = stanza_name

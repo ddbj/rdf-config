@@ -73,7 +73,7 @@ class RDFConfig
 
     def variables
       @variables ||=
-        @config.sparql[name].key?('variables') ? @config.sparql[name]['variables'] : []
+        ((@config.sparql[name].key?('variables') ? @config.sparql[name]['variables'] : []) + parameters.keys).uniq
     end
 
     def options_hash
