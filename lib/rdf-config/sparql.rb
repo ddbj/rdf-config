@@ -20,12 +20,15 @@ class RDFConfig
       @errors = []
       @warnings = []
 
+      @query_name = opts[:sparql_query_name].to_s
+
       sparql_query_name, endpoint_name = @opts[:sparql_query_name].to_s.split(':')
       @opts[:sparql_query_name] = sparql_query_name.nil? ? DEFAULT_NAME : sparql_query_name
       @opts[:endpoint_name] = endpoint_name unless endpoint_name.nil?
 
+      @values = opts[:values] || {}
       @variables = opts[:variables] if opts.key?(:variables)
-      @parameters = opts[:parameters] if opts.key?(:parameters)
+      # @parameters = opts[:parameters] if opts.key?(:parameters)
       if !opts.key?(:check_query_name) || opts[:check_query_name] == true
         raise SPARQLConfigNotFound, "No SPARQL config found: sparql query name '#{name}'" unless @config.sparql.key?(name)
       end
@@ -47,7 +50,17 @@ class RDFConfig
       @common_subject_names = nil
     end
 
+    def print_config
+      puts "query names: #{@config.sparql.keys.join(', ')}"
+      puts "endpoint names: #{@config.endpoint.keys.join(', ')}"
+    end
+
     def generate
+      if @query_name.empty?
+        print_config
+        return
+      end
+
       validate
       output_warning_messages
 
